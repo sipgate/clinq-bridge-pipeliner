@@ -2,73 +2,104 @@ import {
   Adapter,
   Config,
   Contact,
-  PhoneNumber,
-  PhoneNumberLabel,
+  ContactUpdate,
+  ServerError,
   start
 } from "@clinq/bridge";
-import { Request } from "express";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { IPipelinerContactsGet, IPipelinerContactsPatch } from "./models";
+import {
+  convertToClinqContact,
+  convertToPipelinerContact,
+  parseConfig
+} from "./utils";
 
 class MyAdapter implements Adapter {
-  /**
-   * TODO: Fetch contacts from the contacts provider using config.apiKey and config.apiUrl or throw on error
-   */
-  public async getContacts(config: Config): Promise<Contact[]> {
-    const phoneNumber: PhoneNumber = {
-      label: PhoneNumberLabel.MOBILE,
-      phoneNumber: "+4915799912345"
-    };
-    const contact: Contact = {
-      id: "7f23375d-35e2-4034-889a-2bdc9cba9633",
-      name: null,
-      firstName: "Max",
-      lastName: "Mustermann",
-      email: "mustermann@example.com",
-      organization: "MyCompany GmbH",
-      contactUrl:
-        "https://www.example.com/contact/7f23375d-35e2-4034-889a-2bdc9cba9633",
-      avatarUrl:
-        "https://www.example.com/contact/7f23375d-35e2-4034-889a-2bdc9cba9633/avatar.png",
-      phoneNumbers: [phoneNumber]
-    };
-    const contacts: Contact[] = await Promise.resolve([contact]);
-    return contacts;
-  }
+  public async createClient(config: Config) {
+    const { apiKey, apiUrl } = config;
+    if (typeof apiKey !== "string") {
+      throw new Error("Invalid API key.");
+    }
 
-  /**
-   * REQUIRED FOR OAUTH2 FLOW
-   * Return the redirect URL for the given contacts provider.
-   * Users will be redirected here to authorize CLINQ.
-   */
-  public async getOAuth2RedirectUrl(): Promise<string> {
-    const redirectUrl = await Promise.resolve(
-      "https://crm.example.com/oauth2/authorize"
-    );
-    return redirectUrl;
-  }
+    const { token, password, spaceId } = parseConfig(config);
 
-  /**
-   * REQUIRED FOR OAUTH2 FLOW
-   * Users will be redirected here after authorizing CLINQ.
-   *
-   * TODO: Extract the 'code' from request, fetch an access token
-   * and return it as 'apiKey'
-   */
-  public async handleOAuth2Callback(
-    req: Request
-  ): Promise<{ apiKey: string; apiUrl: string }> {
-    // EXAMPLE:
-    // const { code } = req.query;
-    // const query = queryString.stringify({ code });
-    // const response = await request(`https://crm.example.com/oauth2/token?${query}`)
-    // return {
-    // 	apiKey: response.accessToken,
-    // 	apiUrl: response.instanceUrl
-    // };
-
-    return Promise.resolve({
-      apiKey: "a1b2c3",
-      apiUrl: "https://eu5.crm.example.com/api"
+    return axios.create({
+      baseURL: `${apiUrl}/api/v100/rest/spaces/${spaceId}/entities`,
+      auth: {
+        username: token,
+        password
+      }
     });
+  }
+
+  public async getContacts(config: Config): Promise<Contact[]> {
+    const { spaceId, anonKey } = parseConfig(config);
+    try {
+      const client = await this.createClient(config);
+      const contacts: Contact[] = await this.fetchContacts(spaceId, client);
+
+      return contacts;
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error("Could not fetch contacts for {}", anonKey);
+      throw new ServerError(400, "Could not fetch contacts");
+    }
+  }
+
+  public async updateContact(
+    config: Config,
+    id: string,
+    contact: ContactUpdate
+  ) {
+    const { anonKey, spaceId } = parseConfig(config);
+
+    try {
+      const client = await this.createClient(config);
+
+      const pipelinerContact = convertToPipelinerContact(contact);
+
+      const {
+        data
+      }: AxiosResponse<IPipelinerContactsPatch> = await client.patch(
+        `/Contacts/${id}`,
+        pipelinerContact
+      );
+
+      return convertToClinqContact(data.data, spaceId);
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not update contact ${id} for ${anonKey}`);
+      throw new ServerError(400, "Could not fetch contacts");
+    }
+  }
+
+  private async fetchContacts(
+    spaceId: string,
+    client: AxiosInstance,
+    accumulated: Contact[] = []
+  ): Promise<Contact[]> {
+    const { data }: AxiosResponse<IPipelinerContactsGet> = await client.get(
+      "/Contacts",
+      {
+        params: {
+          "order-by": "-created",
+          limit: 2,
+          offset: accumulated.length
+        }
+      }
+    );
+
+    const contacts = data.data.map(contact =>
+      convertToClinqContact(contact, spaceId)
+    );
+    const mergedContacts = [...accumulated, ...contacts];
+    const more = Boolean(mergedContacts.length < Number(data.total));
+
+    if (more) {
+      return this.fetchContacts(spaceId, client, mergedContacts);
+    } else {
+      return mergedContacts;
+    }
   }
 }
 
