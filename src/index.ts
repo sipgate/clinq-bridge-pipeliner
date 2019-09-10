@@ -1,5 +1,5 @@
 import {
-    Adapter,
+    Adapter, CallEvent,
     Config,
     Contact, ContactTemplate,
     ContactUpdate,
@@ -108,6 +108,26 @@ class MyAdapter implements Adapter {
         return;
     }
 
+    public async handleCallEvent(config: Config, event: CallEvent): Promise<void> {
+
+        const pipelinerClients = await fetchClients(config);
+
+        // Fetch the owner
+        const piplienerClient = pipelinerClients
+            .filter(pipelinerClient => true)
+            .find(Boolean) || pipelinerClients[0];
+
+         const client = await createClient(config);
+
+         client.get("Contact?filter[phone1]=");
+         // TODO: fetch the contact
+
+         //TODO: client.post("Notes", note);
+        
+
+        return;
+    }
+
     private async fetchContacts(
         spaceId: string,
         client: AxiosInstance,
@@ -140,17 +160,28 @@ class MyAdapter implements Adapter {
 
 async function fetchFirstClient(config: Config): Promise<IPipelinerClient> {
     const {anonKey} = parseConfig(config);
-    const client = await createClient(config);
-    const clientsResponse: AxiosResponse<IPipelinerClientsGet> = await client.get("Clients");
-    const pipelinerClient: IPipelinerClient | undefined = clientsResponse.data.data.find(Boolean);
 
-    if (!pipelinerClient) {
-        // tslint:disable-next-line:no-console
-        console.error(`Failed to fetch pipeliner user for ${anonKey}`);
-        throw new ServerError(400, "Failed to fetch pipeliner user");
+    const pipelinerClients = await fetchClients(config);
+
+    const result = pipelinerClients.find(Boolean);
+    if (result) {
+        return result;
     }
 
-    return pipelinerClient;
+    throw new ServerError(400, `Failed to fetch pipeliner users for ${anonKey}`)
+}
+
+
+async function fetchClients(config: Config): Promise<IPipelinerClient[]> {
+    const {anonKey} = parseConfig(config);
+    try {
+        const client = await createClient(config);
+        const clientsResponse: AxiosResponse<IPipelinerClientsGet> = await client.get("Clients");
+
+        return clientsResponse.data.data;
+    } catch (e) {
+        throw new ServerError(400, `Failed to fetch pipeliner users for ${anonKey}`)
+    }
 }
 
 start(new MyAdapter());
