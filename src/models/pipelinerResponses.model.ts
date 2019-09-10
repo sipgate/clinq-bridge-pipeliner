@@ -1,12 +1,18 @@
-import { IPipelinerContact } from "./pipelinerContact.model";
+import {IPipelinerClient, IPipelinerContact} from "./pipelinerContact.model";
 
-export interface IPipelinerContactsGet {
+export interface IPipelinerResponse {
   success: boolean;
+}
+
+export interface IPipelinerContactsGet extends IPipelinerResponse {
   data: IPipelinerContact[];
   total: number;
 }
 
-export interface IPipelinerContactsPatch {
-  success: boolean;
+export interface IPipelinerContactsPatch extends IPipelinerResponse {
   data: IPipelinerContact;
+}
+
+export interface IPipelinerClientsGet extends IPipelinerResponse {
+  data: IPipelinerClient[];
 }

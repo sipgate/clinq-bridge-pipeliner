@@ -8,3 +8,7 @@ export interface IPipelinerContactTemplate {
   last_name: string | null;
   phone1: string | null;
 }
+
+export interface IPipelinerClient {
+  id: string;
+}

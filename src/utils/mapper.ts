@@ -1,5 +1,5 @@
 import {
-  Contact,
+  Contact, ContactTemplate,
   ContactUpdate,
   PhoneNumber,
   PhoneNumberLabel
@@ -7,7 +7,7 @@ import {
 import { IPipelinerContact, IPipelinerContactTemplate } from "../models";
 
 export const convertToPipelinerContact = (
-  contact: ContactUpdate
+  contact: ContactUpdate | ContactTemplate
 ): IPipelinerContactTemplate => {
   const phone = contact.phoneNumbers
     .filter(phoneNumber => phoneNumber.label === PhoneNumberLabel.WORK)
