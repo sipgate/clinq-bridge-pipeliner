@@ -1,187 +1,340 @@
 import {
-    Adapter, CallEvent,
-    Config,
-    Contact, ContactTemplate,
-    ContactUpdate,
-    ServerError,
-    start
+  Adapter,
+  CallDirection,
+  CallEvent,
+  Channel,
+  Config,
+  Contact,
+  ContactTemplate,
+  ContactUpdate,
+  ServerError,
+  start
 } from "@clinq/bridge";
-import {AxiosInstance, AxiosResponse} from "axios";
+import { AxiosInstance, AxiosResponse } from "axios";
+import * as moment from "moment";
 import {
-    IPipelinerClient,
-    IPipelinerClientsGet,
-    IPipelinerContact,
-    IPipelinerContactsGet,
-    IPipelinerContactsPatch, IPipelinerResponse
+  IPipelinerClient,
+  IPipelinerClientsGet,
+  IPipelinerContact,
+  IPipelinerContactsGet,
+  IPipelinerContactsPatch,
+  IPipelinerNotePost,
+  IPipelinerResponse
 } from "./models";
+import { INoteTemplate as IPipelinerNote } from "./models/note.model";
 import {
-    convertToClinqContact,
-    convertToPipelinerContact,
-    parseConfig
+  convertToClinqContact,
+  convertToPipelinerContact,
+  parseConfig
 } from "./utils";
-import {createClient} from "./utils/httpClient";
+import { formatDuration } from "./utils/duration";
+import { createClient } from "./utils/httpClient";
+import { normalizePhoneNumber, parsePhoneNumber } from "./utils/phone-number";
 
 class MyAdapter implements Adapter {
+  public async createContact(config: Config, contact: ContactTemplate) {
+    const { spaceId, anonKey } = parseConfig(config);
 
-    public async createContact(config: Config, contact: ContactTemplate) {
+    const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
 
-        const {spaceId, anonKey} = parseConfig(config);
+    try {
+      const client = await createClient(config);
 
-        const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
+      const pipelinerContact = {
+        ...convertToPipelinerContact(contact),
+        owner_id: pipelinerClient.id
+      };
 
-        try {
-            const client = await createClient(config);
+      const contactsPostResponse: AxiosResponse<
+        IPipelinerContact
+      > = await client.post("Contacts", pipelinerContact);
 
-            const pipelinerContact = {
-                ...convertToPipelinerContact(contact),
-                owner_id: pipelinerClient.id
-            };
-
-            const contactsPostResponse: AxiosResponse<IPipelinerContact> = await client.post("Contacts", pipelinerContact);
-
-            return convertToClinqContact(contactsPostResponse.data, spaceId);
-        } catch (error) {
-            // tslint:disable-next-line:no-console
-            console.error(`Could not create contact ${contact.email} for ${anonKey}`);
-            throw new ServerError(400, "Could not fetch contacts");
-        }
+      return convertToClinqContact(contactsPostResponse.data, spaceId);
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not create contact ${contact.email} for ${anonKey}`);
+      throw new ServerError(400, "Could not fetch contacts");
     }
+  }
 
-    public async getContacts(config: Config): Promise<Contact[]> {
-        const {spaceId, anonKey} = parseConfig(config);
-        try {
-            const client = await createClient(config);
-            return await this.fetchContacts(spaceId, client);
-        } catch (error) {
-            // tslint:disable-next-line:no-console
-            console.error("Could not fetch contacts for {}", anonKey);
-            throw new ServerError(400, "Could not fetch contacts");
-        }
+  public async getContacts(config: Config): Promise<Contact[]> {
+    const { spaceId, anonKey } = parseConfig(config);
+    try {
+      const client = await createClient(config);
+      return await this.fetchContacts(spaceId, client);
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error("Could not fetch contacts for {}", anonKey);
+      throw new ServerError(400, "Could not fetch contacts");
     }
+  }
 
-    public async updateContact(
-        config: Config,
-        id: string,
-        contact: ContactUpdate
-    ) {
-        const {anonKey, spaceId} = parseConfig(config);
+  public async updateContact(
+    config: Config,
+    id: string,
+    contact: ContactUpdate
+  ) {
+    const { anonKey, spaceId } = parseConfig(config);
 
-        try {
-            const client = await createClient(config);
+    try {
+      const client = createClient(config);
 
-            const pipelinerContact = convertToPipelinerContact(contact);
+      const pipelinerContact = convertToPipelinerContact(contact);
 
-            const {
-                data
-            }: AxiosResponse<IPipelinerContactsPatch> = await client.patch(
-                `/Contacts/${id}`,
-                pipelinerContact
-            );
+      const {
+        data
+      }: AxiosResponse<IPipelinerContactsPatch> = await client.patch(
+        `/Contacts/${id}`,
+        pipelinerContact
+      );
 
-            return convertToClinqContact(data.data, spaceId);
-        } catch (error) {
-            // tslint:disable-next-line:no-console
-            console.error(`Could not update contact ${id} for ${anonKey}`);
-            throw new ServerError(400, "Could not fetch contacts");
-        }
+      return convertToClinqContact(data.data, spaceId);
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not update contact ${id} for ${anonKey}`);
+      throw new ServerError(400, "Could not fetch contacts");
     }
+  }
 
-    public async deleteContact(config: Config, id: string) {
+  public async deleteContact(config: Config, id: string) {
+    const { anonKey } = parseConfig(config);
 
-        const {anonKey} = parseConfig(config);
+    try {
+      const client = createClient(config);
 
-        try {
-            const client = await createClient(config);
+      const response: AxiosResponse<IPipelinerResponse> = await client.delete(
+        `Contacts/${id}`
+      );
 
-            const response: AxiosResponse<IPipelinerResponse> = await client.delete(`Contacts/${id}`);
-
-            if ((response.status >= 300) || (!response.data.success)) {
-                return;
-            }
-
-        } catch (error) {
-            // tslint:disable-next-line:no-console
-            console.error(`Could not delete contact ${id} for ${anonKey}`);
-            throw new ServerError(400, "Could not delete contact");
-        }
-
+      if (response.status >= 300 || !response.data.success) {
         return;
+      }
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not delete contact ${id} for ${anonKey}`);
+      throw new ServerError(400, "Could not delete contact");
     }
 
-    public async handleCallEvent(config: Config, event: CallEvent): Promise<void> {
+    return;
+  }
 
-        const pipelinerClients = await fetchClients(config);
+  public async handleCallEvent(
+    config: Config,
+    callEvent: CallEvent
+  ): Promise<void> {
+    const { direction, from, to, channel } = callEvent;
+    const { anonKey } = parseConfig(config);
 
-        // Fetch the owner
-        const piplienerClient = pipelinerClients
-            .filter(pipelinerClient => true)
-            .find(Boolean) || pipelinerClients[0];
+    try {
+      const phoneNumber = direction === CallDirection.IN ? from : to;
 
-         const client = await createClient(config);
+      const contact: Contact = await this.getContactByPhoneNumber(
+        config,
+        phoneNumber
+      );
 
-         client.get("Contact?filter[phone1]=");
-         // TODO: fetch the contact
+      const owner = await this.getNoteOwner(config, callEvent.user.email);
 
-         //TODO: client.post("Notes", note);
-        
+      const comment: IPipelinerNote = this.parseCallComment(
+        contact,
+        channel,
+        callEvent,
+        config.locale,
+        owner
+      );
+      await this.createCallComment(config, comment);
 
-        return;
+      return;
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not save CallEvent for ${anonKey}: ${error}`);
+      throw new ServerError(400, "Could not save CallEvent");
     }
+  }
 
-    private async fetchContacts(
-        spaceId: string,
-        client: AxiosInstance,
-        accumulated: Contact[] = []
-    ): Promise<Contact[]> {
-        const {data}: AxiosResponse<IPipelinerContactsGet> = await client.get(
-            "/Contacts",
-            {
-                params: {
-                    "order-by": "-created",
-                    limit: 2,
-                    offset: accumulated.length
-                }
-            }
-        );
+  private async getNoteOwner(
+    config: Config,
+    term: string
+  ): Promise<IPipelinerClient> {
+    const pipelinerClients = await fetchClients(config);
+    return (
+      pipelinerClients
+        .filter(pipelinerClient => pipelinerClient.email === term)
+        .find(Boolean) || pipelinerClients[0]
+    );
+  }
 
-        const contacts = data.data.map(contact =>
-            convertToClinqContact(contact, spaceId)
-        );
-        const mergedContacts = [...accumulated, ...contacts];
-        const more = Boolean(mergedContacts.length < Number(data.total));
+  private async createCallComment(
+    config: Config,
+    comment: IPipelinerNote
+  ): Promise<IPipelinerNote> {
+    const { anonKey } = parseConfig(config);
+    try {
+      const client = createClient(config);
+      const { data: note }: IPipelinerNotePost = await client.post(
+        "/Notes",
+        comment
+      );
+      // tslint:disable-next-line:no-console
+      console.log(`Created call note for ${anonKey}`);
+      return note;
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(
+        `Could not create call note for key "${anonKey}: ${error.message}"`
+      );
+      throw new ServerError(400, "Could not create call note");
+    }
+  }
 
-        if (more) {
-            return this.fetchContacts(spaceId, client, mergedContacts);
-        } else {
-            return mergedContacts;
+  private parseCallComment(
+    contact: Contact,
+    channel: Channel,
+    callEvent: CallEvent,
+    locale: string,
+    owner: IPipelinerClient
+  ): IPipelinerNote {
+    const { end, direction } = callEvent;
+    const date = moment(Number(callEvent.start));
+
+    const duration = formatDuration(Number(end) - Number(callEvent.start));
+    const isGerman = locale === "de_DE";
+
+    const directionInfo =
+      direction === CallDirection.IN
+        ? isGerman
+          ? "Eingehender"
+          : "Incoming"
+        : isGerman
+        ? "Ausgehender"
+        : "Outgoing";
+
+    const textEN = `<div><strong>${directionInfo}</strong> CLINQ call in <strong>"${
+      channel.name
+    }"</strong> on ${date.format("YYYY-MM-DD")} (${duration})<div>`;
+    const textDE = `<div><strong>${directionInfo}</strong> CLINQ Anruf in <strong>"${
+      channel.name
+    }"</strong> am ${date.format("DD.MM.YYYY")} (${duration})<div>`;
+
+    return {
+      owner_id: owner.id,
+      contact_id: contact.id,
+      note: isGerman ? textDE : textEN
+    };
+  }
+
+  private async getContactByPhoneNumber(
+    config: Config,
+    phoneNumber: string
+  ): Promise<Contact> {
+    const field = "phone1";
+    const { anonKey, spaceId } = parseConfig(config);
+    const parsedPhoneNumber = parsePhoneNumber(phoneNumber);
+    const contacts = await Promise.all([
+      this.findPerson(config, field, `%2B${phoneNumber}`),
+      this.findPerson(config, field, phoneNumber),
+      this.findPerson(config, field, parsedPhoneNumber.localized),
+      this.findPerson(
+        config,
+        field,
+        normalizePhoneNumber(parsedPhoneNumber.localized)
+      ),
+      this.findPerson(config, field, parsedPhoneNumber.e164),
+      this.findPerson(
+        config,
+        field,
+        normalizePhoneNumber(parsedPhoneNumber.e164)
+      )
+    ]);
+
+    const contact = contacts.find(Boolean);
+
+    if (!contact) {
+      throw new ServerError(
+        400,
+        `Could not find pipeliner contact by phone number ${parsedPhoneNumber.localized} for ${anonKey}`
+      );
+    }
+    const response = convertToClinqContact(contact, spaceId);
+
+    return response;
+  }
+
+  private async findPerson(
+    config: Config,
+    field: string,
+    value: string
+  ): Promise<IPipelinerContact | null> {
+    const client = createClient(config);
+    const response: AxiosResponse<IPipelinerContactsGet> = await client.get(
+      `/Contacts?filter${encodeURI(`[${field}]`)}=${value}`
+    );
+
+    const contacts = response.data.data.find(Boolean);
+    if (!contacts) {
+      return null;
+    }
+    return contacts;
+  }
+
+  private async fetchContacts(
+    spaceId: string,
+    client: AxiosInstance,
+    accumulated: Contact[] = []
+  ): Promise<Contact[]> {
+    const { data }: AxiosResponse<IPipelinerContactsGet> = await client.get(
+      "/Contacts",
+      {
+        params: {
+          "order-by": "-created",
+          limit: 2,
+          offset: accumulated.length
         }
+      }
+    );
+
+    const contacts = data.data.map(contact =>
+      convertToClinqContact(contact, spaceId)
+    );
+    const mergedContacts = [...accumulated, ...contacts];
+    const more = Boolean(mergedContacts.length < Number(data.total));
+
+    if (more) {
+      return this.fetchContacts(spaceId, client, mergedContacts);
+    } else {
+      return mergedContacts;
     }
+  }
 }
 
 async function fetchFirstClient(config: Config): Promise<IPipelinerClient> {
-    const {anonKey} = parseConfig(config);
+  const { anonKey } = parseConfig(config);
 
-    const pipelinerClients = await fetchClients(config);
+  const pipelinerClients = await fetchClients(config);
 
-    const result = pipelinerClients.find(Boolean);
-    if (result) {
-        return result;
-    }
+  const result = pipelinerClients.find(Boolean);
+  if (result) {
+    return result;
+  }
 
-    throw new ServerError(400, `Failed to fetch pipeliner users for ${anonKey}`)
+  throw new ServerError(400, `Failed to fetch pipeliner users for ${anonKey}`);
 }
 
-
 async function fetchClients(config: Config): Promise<IPipelinerClient[]> {
-    const {anonKey} = parseConfig(config);
-    try {
-        const client = await createClient(config);
-        const clientsResponse: AxiosResponse<IPipelinerClientsGet> = await client.get("Clients");
+  const { anonKey } = parseConfig(config);
+  try {
+    const client = createClient(config);
+    const clientsResponse: AxiosResponse<
+      IPipelinerClientsGet
+    > = await client.get("Clients");
 
-        return clientsResponse.data.data;
-    } catch (e) {
-        throw new ServerError(400, `Failed to fetch pipeliner users for ${anonKey}`)
-    }
+    return clientsResponse.data.data;
+  } catch (e) {
+    throw new ServerError(
+      400,
+      `Failed to fetch pipeliner users for ${anonKey}`
+    );
+  }
 }
 
 start(new MyAdapter());
