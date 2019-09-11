@@ -80,7 +80,7 @@ class MyAdapter implements Adapter {
 
       const contactsPostResponse: AxiosResponse<
         IPipelinerContact
-      > = await client.post("Contacts", pipelinerContact);
+      > = await client.post("/Contacts", pipelinerContact);
 
       return convertToClinqContact(contactsPostResponse.data, spaceId);
     } catch (error) {
@@ -176,8 +176,6 @@ class MyAdapter implements Adapter {
         owner
       );
       await this.createCallComment(config, comment);
-
-      return;
     } catch (error) {
       // tslint:disable-next-line:no-console
       console.error(`Could not save CallEvent for ${anonKey}: ${error}`);
