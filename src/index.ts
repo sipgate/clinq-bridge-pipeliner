@@ -20,6 +20,7 @@ import {
   IPipelinerContact,
   IPipelinerContactsGet,
   IPipelinerContactsPatch,
+  IPipelinerContactsPost,
   IPipelinerNotePost,
   IPipelinerResponse
 } from "./models";
@@ -78,9 +79,12 @@ class MyAdapter implements Adapter {
         owner_id: pipelinerClient.id
       };
 
-      const contactsPostResponse: AxiosResponse<
-        IPipelinerContact
-      > = await client.post("/Contacts", pipelinerContact);
+      const {
+        data: contactsPostResponse
+      }: AxiosResponse<IPipelinerContactsPost> = await client.post(
+        "/Contacts",
+        pipelinerContact
+      );
 
       return convertToClinqContact(contactsPostResponse.data, spaceId);
     } catch (error) {

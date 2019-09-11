@@ -11,6 +11,10 @@ export interface IPipelinerContactsGet extends IPipelinerResponse {
   total: number;
 }
 
+export interface IPipelinerContactsPost extends IPipelinerResponse {
+  data: IPipelinerContact;
+}
+
 export interface IPipelinerContactsPatch extends IPipelinerResponse {
   data: IPipelinerContact;
 }
