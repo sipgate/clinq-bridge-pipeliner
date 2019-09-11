@@ -47,10 +47,10 @@ class MyAdapter implements Adapter {
      * if CLINQ customer dont like the "UNKNOWN" in contacts and notes
      */
     // let account = null;
-    const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
 
     try {
       const client = await createClient(config);
+      const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
 
       /*
        * Add logic for creating account and ContactAccountRelation
