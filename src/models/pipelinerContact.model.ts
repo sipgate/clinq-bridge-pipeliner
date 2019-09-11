@@ -7,6 +7,9 @@ export interface IPipelinerContactTemplate {
   first_name: string | null;
   last_name: string | null;
   phone1: string | null;
+  primary_account?: {
+    id: string;
+  };
 }
 
 export interface IPipelinerClient {

@@ -1,25 +1,36 @@
 import {
-  Contact, ContactTemplate,
+  Contact,
+  ContactTemplate,
   ContactUpdate,
   PhoneNumber,
   PhoneNumberLabel
 } from "@clinq/bridge";
 import { IPipelinerContact, IPipelinerContactTemplate } from "../models";
+import { IPipelinerAccount } from "../models/pipelinerAccount.model";
 
 export const convertToPipelinerContact = (
-  contact: ContactUpdate | ContactTemplate
+  contact: ContactUpdate | ContactTemplate,
+  account: IPipelinerAccount | null = null
 ): IPipelinerContactTemplate => {
   const phone = contact.phoneNumbers
     .filter(phoneNumber => phoneNumber.label === PhoneNumberLabel.WORK)
     .map(phoneNumber => phoneNumber.phoneNumber)
     .find(Boolean);
 
-  return {
+  const contactTemplate: IPipelinerContactTemplate = {
     email1: contact.email ? contact.email : null,
     first_name: contact.firstName ? contact.firstName : null,
     last_name: contact.lastName ? contact.lastName : null,
     phone1: phone ? phone : null
   };
+
+  if (account) {
+    contactTemplate.primary_account = {
+      id: account.id
+    };
+  }
+
+  return contactTemplate;
 };
 
 export const convertToClinqContact = (

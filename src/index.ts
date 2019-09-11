@@ -13,6 +13,8 @@ import {
 import { AxiosInstance, AxiosResponse } from "axios";
 import * as moment from "moment";
 import {
+  IPipelinerAccountsGet,
+  IPipelinerAccountsPost,
   IPipelinerClient,
   IPipelinerClientsGet,
   IPipelinerContact,
@@ -23,10 +25,15 @@ import {
 } from "./models";
 import { INoteTemplate as IPipelinerNote } from "./models/note.model";
 import {
+  IPipelinerAccount,
+  IPipelinerAccountTemplate
+} from "./models/pipelinerAccount.model";
+import {
   convertToClinqContact,
   convertToPipelinerContact,
   parseConfig
 } from "./utils";
+import { getCachedContacts } from "./utils/cacheClient";
 import { formatDuration } from "./utils/duration";
 import { createClient } from "./utils/httpClient";
 import { normalizePhoneNumber, parsePhoneNumber } from "./utils/phone-number";
@@ -35,10 +42,36 @@ class MyAdapter implements Adapter {
   public async createContact(config: Config, contact: ContactTemplate) {
     const { spaceId, anonKey } = parseConfig(config);
 
+    /*
+     * Add logic for creating account and ContactAccountRelation
+     * if CLINQ customer dont like the "UNKNOWN" in contacts and notes
+     */
+    // let account = null;
     const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
 
     try {
       const client = await createClient(config);
+
+      /*
+       * Add logic for creating account and ContactAccountRelation
+       * if CLINQ customer dont like the "UNKNOWN" in contacts and notes
+       */
+
+      // if (contact.organization) {
+      //   account = await this.findAccountByOrganizationname(
+      //     config,
+      //     contact.organization
+      //   );
+
+      //   if (!account) {
+      //     account = await this.createAccount(config, contact.organization);
+      //   }
+      // }
+
+      // const pipelinerContact = {
+      //   ...convertToPipelinerContact(contact),
+      //   owner_id: pipelinerClient.id
+      // };
 
       const pipelinerContact = {
         ...convertToPipelinerContact(contact),
@@ -152,6 +185,38 @@ class MyAdapter implements Adapter {
     }
   }
 
+  private async createAccount(
+    config: Config,
+    name: string
+  ): Promise<IPipelinerAccount> {
+    const { anonKey } = parseConfig(config);
+    const client = createClient(config);
+
+    try {
+      const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
+      const pipelinerAccount: IPipelinerAccountTemplate = {
+        name,
+        owner_id: pipelinerClient.id
+      };
+
+      const {
+        data: { data }
+      }: AxiosResponse<IPipelinerAccountsPost> = await client.post(
+        "/Accounts",
+        pipelinerAccount
+      );
+
+      // tslint:disable-next-line:no-console
+      console.log(`Created account (${data.id}) for ${anonKey}`);
+
+      return data;
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(`Could not create account for ${anonKey}: ${error}`);
+      throw new ServerError(400, "Could not create account");
+    }
+  }
+
   private async getNoteOwner(
     config: Config,
     term: string
@@ -162,6 +227,26 @@ class MyAdapter implements Adapter {
         .filter(pipelinerClient => pipelinerClient.email === term)
         .find(Boolean) || pipelinerClients[0]
     );
+  }
+
+  private async findAccountByOrganizationname(config: Config, name: string) {
+    const { anonKey } = parseConfig(config);
+    const client = createClient(config);
+
+    try {
+      const {
+        data: { data: organizations }
+      }: AxiosResponse<IPipelinerAccountsGet> = await client.get(
+        `/Accounts?filter${encodeURI("[name]")}=${name}`
+      );
+      return organizations.find(Boolean);
+    } catch (error) {
+      // tslint:disable-next-line:no-console
+      console.error(
+        `Could not find account by name "${name}" for key "${anonKey}: ${error.message}"`
+      );
+      throw new ServerError(400, "Could not find account");
+    }
   }
 
   private async createCallComment(
@@ -223,6 +308,20 @@ class MyAdapter implements Adapter {
     };
   }
 
+  private async findContactInCache(config: Config, phoneNumber: string) {
+    // tslint:disable-next-line:no-console
+    console.log(`Searching for contact in cache for ${phoneNumber}`);
+
+    const {
+      data: contacts
+    }: AxiosResponse<Contact[]> = await getCachedContacts(config);
+    return contacts.find(contact =>
+      contact.phoneNumbers.map(
+        contactPhoneNumber => contactPhoneNumber.phoneNumber === phoneNumber
+      )
+    );
+  }
+
   private async getContactByPhoneNumber(
     config: Config,
     phoneNumber: string
@@ -231,8 +330,8 @@ class MyAdapter implements Adapter {
     const { anonKey, spaceId } = parseConfig(config);
     const parsedPhoneNumber = parsePhoneNumber(phoneNumber);
     const contacts = await Promise.all([
-      this.findPerson(config, field, `%2B${phoneNumber}`),
       this.findPerson(config, field, phoneNumber),
+      this.findPerson(config, field, `%2B${phoneNumber}`),
       this.findPerson(config, field, parsedPhoneNumber.localized),
       this.findPerson(
         config,
@@ -250,9 +349,17 @@ class MyAdapter implements Adapter {
     const contact = contacts.find(Boolean);
 
     if (!contact) {
+      const cachedContact = await this.findContactInCache(config, phoneNumber);
+
+      if (cachedContact) {
+        // tslint:disable-next-line:no-console
+        console.log(`Found contact in cache`);
+        return cachedContact;
+      }
+
       throw new ServerError(
         400,
-        `Could not find pipeliner contact by phone number ${parsedPhoneNumber.localized} for ${anonKey}`
+        `Could not find pipeliner contact by phone number ${phoneNumber} for ${anonKey}`
       );
     }
     const response = convertToClinqContact(contact, spaceId);

@@ -1,4 +1,5 @@
 import { INoteTemplate } from "./note.model";
+import { IPipelinerAccount } from "./pipelinerAccount.model";
 import { IPipelinerClient, IPipelinerContact } from "./pipelinerContact.model";
 
 export interface IPipelinerResponse {
@@ -20,4 +21,10 @@ export interface IPipelinerClientsGet extends IPipelinerResponse {
 
 export interface IPipelinerNotePost extends IPipelinerResponse {
   data: INoteTemplate;
+}
+export interface IPipelinerAccountsGet extends IPipelinerResponse {
+  data: IPipelinerAccount[];
+}
+export interface IPipelinerAccountsPost extends IPipelinerResponse {
+  data: IPipelinerAccount;
 }
