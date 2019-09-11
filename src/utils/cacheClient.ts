@@ -2,9 +2,7 @@ import { Config } from "@clinq/bridge";
 import axios from "axios";
 
 export function createCacheClient(config: Config) {
-  // const { BRIDGE_URL } = process.env;
-
-  const BRIDGE_URL = "http://127.0.0.1:8080";
+  const { BRIDGE_URL } = process.env;
 
   return axios.create({
     baseURL: `${BRIDGE_URL}`,
