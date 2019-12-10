@@ -1,0 +1,10 @@
+runtime: nodejs12
+service: clinq-bridge-pipeliner
+entrypoint: node dist/index.js
+
+liveness_check:
+  path: "/health"
+  check_interval_sec: 30
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
