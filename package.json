@@ -1,5 +1,5 @@
 {
-  "name": "clinq-bridge-boilerplate",
+  "name": "clinq-bridge-pipeliner",
   "version": "1.0.0",
   "description": "Boilerplate project to bootstrap a new CLINQ Bridge",
   "main": "dist/index.js",
@@ -18,7 +18,6 @@
   "scripts": {
     "start": "ts-node-dev src/index.ts",
     "build": "tsc",
-    "gcp-build": "tsc",
     "lint": "tslint --project tsconfig.json"
   },
   "dependencies": {
@@ -33,6 +32,7 @@
     "typescript": "^3.5.1"
   },
   "devDependencies": {
+    "dockerfilelint": "^1.5.0",
     "husky": "^2.4.0",
     "lint-staged": "^8.2.0",
     "prettier": "^1.18.2",
@@ -55,6 +55,9 @@
     "*.{json,yml,md}": [
       "prettier --write",
       "git add"
+    ],
+    "Dockerfile": [
+      "dockerfilelint"
     ]
   }
 }
