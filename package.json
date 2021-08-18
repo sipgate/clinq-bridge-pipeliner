@@ -1,7 +1,7 @@
 {
   "name": "clinq-bridge-pipeliner",
   "version": "1.0.0",
-  "description": "Boilerplate project to bootstrap a new CLINQ Bridge",
+  "description": "CLINQ bridge for Pipeliner",
   "main": "dist/index.js",
   "repository": "git@github.com:sipgate/clinq-bridge-boilerplate.git",
   "contributors": [
@@ -21,7 +21,7 @@
     "lint": "tslint --project tsconfig.json"
   },
   "dependencies": {
-    "@clinq/bridge": "^11.1.1",
+    "@clinq/bridge": "^11.2.4",
     "@types/express": "^4.17.0",
     "@types/google-libphonenumber": "^7.4.17",
     "@types/node": "^12.0.7",
