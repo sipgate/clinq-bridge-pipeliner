@@ -3,7 +3,7 @@ import {
   ContactTemplate,
   ContactUpdate,
   PhoneNumber,
-  PhoneNumberLabel
+  PhoneNumberLabel,
 } from "@clinq/bridge";
 import { IPipelinerContact, IPipelinerContactTemplate } from "../models";
 import { IPipelinerAccount } from "../models/pipelinerAccount.model";
@@ -13,20 +13,20 @@ export const convertToPipelinerContact = (
   account: IPipelinerAccount | null = null
 ): IPipelinerContactTemplate => {
   const phone = contact.phoneNumbers
-    .filter(phoneNumber => phoneNumber.label === PhoneNumberLabel.WORK)
-    .map(phoneNumber => phoneNumber.phoneNumber)
+    .filter((phoneNumber) => phoneNumber.label === PhoneNumberLabel.WORK)
+    .map((phoneNumber) => phoneNumber.phoneNumber)
     .find(Boolean);
 
   const contactTemplate: IPipelinerContactTemplate = {
     email1: contact.email ? contact.email : null,
     first_name: contact.firstName ? contact.firstName : null,
     last_name: contact.lastName ? contact.lastName : null,
-    phone1: phone ? phone : null
+    phone1: phone ? phone : null,
   };
 
   if (account) {
     contactTemplate.primary_account = {
-      id: account.id
+      id: account.id,
     };
   }
 
@@ -42,7 +42,7 @@ export const convertToClinqContact = (
   if (contact.phone1 && contact.phone1 !== "") {
     phoneNumbers.push({
       label: PhoneNumberLabel.WORK,
-      phoneNumber: contact.phone1
+      phoneNumber: contact.phone1,
     });
   }
 
@@ -57,6 +57,6 @@ export const convertToClinqContact = (
     lastName: contact.last_name ? contact.last_name : null,
     email: contact.email1 ? contact.email1 : null,
     organization: null,
-    phoneNumbers
+    phoneNumbers,
   };
 };

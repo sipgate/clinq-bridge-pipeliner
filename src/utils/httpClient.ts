@@ -11,7 +11,7 @@ export function createClient(config: Config) {
     baseURL: `${apiUrl}/api/v100/rest/spaces/${spaceId}/entities`,
     auth: {
       username: token,
-      password
-    }
+      password,
+    },
   });
 }

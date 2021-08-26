@@ -9,8 +9,8 @@ export function createCacheClient(config: Config) {
     headers: {
       "X-Provider-URL": config.apiUrl,
       "X-Provider-Key": config.apiKey,
-      "X-Provider-Locale": config.locale
-    }
+      "X-Provider-Locale": config.locale,
+    },
   });
 }
 export function getCachedContacts(config: Config) {

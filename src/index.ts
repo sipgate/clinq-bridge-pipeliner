@@ -8,7 +8,7 @@ import {
   ContactTemplate,
   ContactUpdate,
   ServerError,
-  start
+  start,
 } from "@clinq/bridge";
 import { AxiosInstance, AxiosResponse } from "axios";
 import * as moment from "moment";
@@ -22,17 +22,17 @@ import {
   IPipelinerContactsPatch,
   IPipelinerContactsPost,
   IPipelinerNotePost,
-  IPipelinerResponse
+  IPipelinerResponse,
 } from "./models";
 import { INoteTemplate as IPipelinerNote } from "./models/note.model";
 import {
   IPipelinerAccount,
-  IPipelinerAccountTemplate
+  IPipelinerAccountTemplate,
 } from "./models/pipelinerAccount.model";
 import {
   convertToClinqContact,
   convertToPipelinerContact,
-  parseConfig
+  parseConfig,
 } from "./utils";
 import { getCachedContacts } from "./utils/cacheClient";
 import { formatDuration } from "./utils/duration";
@@ -76,11 +76,11 @@ class MyAdapter implements Adapter {
 
       const pipelinerContact = {
         ...convertToPipelinerContact(contact),
-        owner_id: pipelinerClient.id
+        owner_id: pipelinerClient.id,
       };
 
       const {
-        data: contactsPostResponse
+        data: contactsPostResponse,
       }: AxiosResponse<IPipelinerContactsPost> = await client.post(
         "/Contacts",
         pipelinerContact
@@ -118,12 +118,8 @@ class MyAdapter implements Adapter {
 
       const pipelinerContact = convertToPipelinerContact(contact);
 
-      const {
-        data
-      }: AxiosResponse<IPipelinerContactsPatch> = await client.patch(
-        `/Contacts/${id}`,
-        pipelinerContact
-      );
+      const { data }: AxiosResponse<IPipelinerContactsPatch> =
+        await client.patch(`/Contacts/${id}`, pipelinerContact);
 
       return convertToClinqContact(data.data, spaceId);
     } catch (error) {
@@ -198,11 +194,11 @@ class MyAdapter implements Adapter {
       const pipelinerClient: IPipelinerClient = await fetchFirstClient(config);
       const pipelinerAccount: IPipelinerAccountTemplate = {
         name,
-        owner_id: pipelinerClient.id
+        owner_id: pipelinerClient.id,
       };
 
       const {
-        data: { data }
+        data: { data },
       }: AxiosResponse<IPipelinerAccountsPost> = await client.post(
         "/Accounts",
         pipelinerAccount
@@ -226,7 +222,7 @@ class MyAdapter implements Adapter {
     const pipelinerClients = await fetchClients(config);
     return (
       pipelinerClients
-        .filter(pipelinerClient => pipelinerClient.email === term)
+        .filter((pipelinerClient) => pipelinerClient.email === term)
         .find(Boolean) || pipelinerClients[0]
     );
   }
@@ -237,7 +233,7 @@ class MyAdapter implements Adapter {
 
     try {
       const {
-        data: { data: organizations }
+        data: { data: organizations },
       }: AxiosResponse<IPipelinerAccountsGet> = await client.get(
         `/Accounts?filter${encodeURI("[name]")}=${name}`
       );
@@ -306,7 +302,7 @@ class MyAdapter implements Adapter {
     return {
       owner_id: owner.id,
       contact_id: contact.id,
-      note: isGerman ? textDE : textEN
+      note: isGerman ? textDE : textEN,
     };
   }
 
@@ -314,12 +310,11 @@ class MyAdapter implements Adapter {
     // tslint:disable-next-line:no-console
     console.log(`Searching for contact in cache for ${phoneNumber}`);
 
-    const {
-      data: contacts
-    }: AxiosResponse<Contact[]> = await getCachedContacts(config);
-    return contacts.find(contact =>
+    const { data: contacts }: AxiosResponse<Contact[]> =
+      await getCachedContacts(config);
+    return contacts.find((contact) =>
       contact.phoneNumbers.map(
-        contactPhoneNumber => contactPhoneNumber.phoneNumber === phoneNumber
+        (contactPhoneNumber) => contactPhoneNumber.phoneNumber === phoneNumber
       )
     );
   }
@@ -345,7 +340,7 @@ class MyAdapter implements Adapter {
         config,
         field,
         normalizePhoneNumber(parsedPhoneNumber.e164)
-      )
+      ),
     ]);
 
     const contact = contacts.find(Boolean);
@@ -397,12 +392,12 @@ class MyAdapter implements Adapter {
         params: {
           "order-by": "-created",
           limit: 2,
-          offset: accumulated.length
-        }
+          offset: accumulated.length,
+        },
       }
     );
 
-    const contacts = data.data.map(contact =>
+    const contacts = data.data.map((contact) =>
       convertToClinqContact(contact, spaceId)
     );
     const mergedContacts = [...accumulated, ...contacts];
@@ -433,9 +428,8 @@ async function fetchClients(config: Config): Promise<IPipelinerClient[]> {
   const { anonKey } = parseConfig(config);
   try {
     const client = createClient(config);
-    const clientsResponse: AxiosResponse<
-      IPipelinerClientsGet
-    > = await client.get("Clients");
+    const clientsResponse: AxiosResponse<IPipelinerClientsGet> =
+      await client.get("Clients");
 
     return clientsResponse.data.data;
   } catch (e) {
